@@ -6,6 +6,9 @@ import { SlickItem } from './SlickItem';
 export const SlickList = defineComponent({
   name: 'SlickList',
   mixins: [ContainerMixin],
+  compatConfig: {
+    MODE: 3,
+  },
   props: {
     tag: {
       type: String,
