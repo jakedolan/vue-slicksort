@@ -186,6 +186,9 @@ export const ContainerMixin = defineComponent({
     useDragHandle: { type: Boolean, default: false },
     useWindowAsScrollContainer: { type: Boolean, default: false },
     hideSortableGhost: { type: Boolean, default: true },
+    isLeaf: { type: Boolean, default: true},
+    leavesFieldName: { type: String, default: 'leaves'},
+    rootUuid: { type: String, default: null},
     lockToContainerEdges: { type: Boolean, default: false },
     lockOffset: { type: [String, Number, Array] as PropType<string | number | number[]>, default: '50%' },
     transitionDuration: { type: Number, default: 300 },
@@ -237,6 +240,7 @@ export const ContainerMixin = defineComponent({
   },
 
   mounted() {
+    // console.log("countainer mixin mounted", this.$props);
     if (this.hub) {
       this.id = this.hub.getId();
     }
@@ -376,10 +380,11 @@ export const ContainerMixin = defineComponent({
     },
 
     handlePress(e: PointEvent) {
+      
       e.stopPropagation();
       const active = this.manager.getActive();
-
-      if (active) {
+      // console.log("handlePress", { e, active, this: this});
+      if (active) {        
         const { getHelperDimensions, helperClass, hideSortableGhost, appendTo } = this.$props;
         const { node } = active;
         const { index } = node.sortableInfo;
@@ -465,6 +470,7 @@ export const ContainerMixin = defineComponent({
     },
 
     handleDropOut() {
+      // console.log("container dropout");
       const removed = this.list[this.index!];
       const newValue = arrayRemove(this.list, this.index!);
       this.$emit('sort-remove', {
@@ -475,7 +481,9 @@ export const ContainerMixin = defineComponent({
     },
 
     handleDropIn(payload: unknown) {
+      // console.log("container handleDropIn", { list: this.list, newIndex: this.newIndex, payload });
       const newValue = arrayInsert(this.list, this.newIndex!, payload);
+      // console.log("this.list", this.list);
       this.$emit('sort-insert', {
         newIndex: this.newIndex,
         value: payload,
@@ -485,6 +493,7 @@ export const ContainerMixin = defineComponent({
     },
 
     handleDragOut() {
+      // console.log("container handleDrageOut");
       if (this.autoscrollInterval) {
         clearInterval(this.autoscrollInterval);
         this.autoscrollInterval = null;
@@ -577,6 +586,7 @@ export const ContainerMixin = defineComponent({
     },
 
     handleDragIn(e: PointEvent, sortableGhost: SortableNode, helper: SortableNode) {
+      // console.log("container handleDragIn", { e, sortableGhost, helper});
       if (this.hub!.isSource(this as ContainerRef)) {
         return;
       }

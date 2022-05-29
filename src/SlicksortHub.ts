@@ -13,6 +13,12 @@ export interface ContainerRef {
   manager: Manager;
   sortableGhost: HTMLElement | null;
 
+  // Custom fields
+  isLeaf: boolean;
+  leavesFieldName: string;
+  rootUuid: string;
+  
+
   handleDragIn(e: PointEvent, ghost: HTMLElement | null, helper: HTMLElement | null): void;
   handleDragOut(): void;
   handleDragEnd(): void;
@@ -36,7 +42,16 @@ export type AcceptProp = boolean | string[] | ((args: AcceptPropArgs) => boolean
  * Allow the same group by default, this can be overridden with the block prop
  */
 function canAcceptElement(dest: ContainerRef, source: ContainerRef, payload: unknown): boolean {
+  // console.log('## canAcceptElement', { dest, source, payload});
   if (source.id === dest.id) return true;
+
+  //! This is a bit hackish to prevent an existing list with leaves to be added to a leaf.
+  if (dest.isLeaf && payload[dest.leavesFieldName] && Array.isArray(payload[dest.leavesFieldName]) && payload[dest.leavesFieldName].length > 0) {
+    // console.log("## can't accept");
+    return false;
+  }
+
+
   if (dest.block && dest.block.includes(source.group)) return false;
   if (typeof dest.accept === 'function') {
     return dest.accept({ dest, source, payload });
@@ -49,34 +64,67 @@ function canAcceptElement(dest: ContainerRef, source: ContainerRef, payload: unk
   return false;
 }
 
+
+function printRefs(refs: ContainerRef[]): void {
+  console.log("## REFS");
+  for (let i = 0; i < refs.length; i++) {
+    console.log(`${refs[i].id}`, refs[i]);
+  }
+}
+
+
 function findClosestDest(
   { x, y }: { x: number; y: number },
   refs: ContainerRef[],
   currentDest: ContainerRef,
+  payload: unknown
 ): ContainerRef | null {
-  // Quickly check if we are within the bounds of the current destination
-  if (isPointWithinRect({ x, y }, currentDest.container.getBoundingClientRect())) {
-    return currentDest;
+  // Quickly check if we are within the bounds of the current destination and currentDest is a leaf level list.
+  // console.log(`findClosestDest ${currentDest.id} - ${currentDest.container.className}`);
+  if (isPointWithinRect({ x, y }, currentDest.container.getBoundingClientRect()) && currentDest.isLeaf) {
+     return currentDest;
   }
+  // console.log(`continue searhing`);
 
   let closest = null;
   let minDistance = Infinity;
+  // printRefs(refs);
+  let root = null;
   for (let i = 0; i < refs.length; i++) {
     const ref = refs[i];
-    const rect = ref.container.getBoundingClientRect();
-    const isWithin = isPointWithinRect({ x, y }, rect);
 
-    if (isWithin) {
-      // If we are within another destination, stop here
-      return ref;
-    }
+    
+    if (ref.rootUuid === payload.uuid) {
+      // console.log("not eligible dest.");
+    } else {
 
-    const center = getRectCenter(rect);
-    const distance = getDistance(x, y, center.x, center.y);
-    if (distance < minDistance) {
-      closest = ref;
-      minDistance = distance;
+      const rect = ref.container.getBoundingClientRect();
+      // console.log(`checking ref ${ref.id}]`);
+      if (isPointWithinRect({ x, y }, rect)) {
+        // Check for leaf, return a leaf over root.
+        if (ref.isLeaf) {
+          // console.log("leaf found", { payloadUuid: payload.uuid, refUuid: ref.rootUuid});
+          // If we are within another destination, stop here
+          return ref;
+        } else {
+          // console.log("root found");
+          root = ref;
+        }
+      }
+
+      const center = getRectCenter(rect);
+      const distance = getDistance(x, y, center.x, center.y);
+      if (distance < minDistance) {
+        closest = ref;
+        minDistance = distance;
+      }
     }
+    
+  }
+
+  // if root, but not leaf was found return it.
+  if (root) {
+    return root;
   }
 
   // Try to guess the closest destination
@@ -112,6 +160,7 @@ export default class SlicksortHub {
   }
 
   addContainer(ref: ContainerRef): void {
+    // console.log("hub add container", ref);
     this.refs.push(ref);
   }
 
@@ -124,16 +173,20 @@ export default class SlicksortHub {
     this.dest = ref;
   }
 
+
   handleSortMove(e: PointEvent, payload: unknown): void {
     const dest = this.dest;
     const source = this.source;
-
+    
     if (!dest || !source) return;
 
     const refs = this.refs;
     const pointer = getPointerOffset(e, 'client');
-    const newDest = findClosestDest(pointer, refs, dest) || dest;
+    const newDest = findClosestDest(pointer, refs, dest, payload) || dest;
+    // console.log(`handleSortMove ${newDest.container.className} (${refs.length})`, { e, dest, newDest, payload, source});
 
+    
+    // console.log("???", { isDiff: dest.id !== newDest.id, canAccept: canAcceptElement(newDest, source, payload) });
     if (dest.id !== newDest.id && canAcceptElement(newDest, source, payload)) {
       this.dest = newDest;
       dest.handleDragOut();
@@ -147,8 +200,11 @@ export default class SlicksortHub {
   }
 
   handleSortEnd(): void {
+    // console.log("handleSortEnd", { source: this.source.id, dest: this.dest.id });
     if (this.source?.id === this.dest?.id) return;
+    // console.log("procceed to handleDropOut", { source: this.source});
     const payload = this.source?.handleDropOut();
+    // console.log("procceed to handleDropIn", { dest: this.dest, payload});
     this.dest?.handleDropIn(payload);
     this.reset();
   }
