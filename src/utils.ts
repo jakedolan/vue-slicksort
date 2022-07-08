@@ -57,6 +57,13 @@ export function arrayInsert<T>(arr: T[], newIndex: number, value: T): T[] {
   return array;
 }
 
+export const eventsPassive: Record<string, boolean>= {
+  start: false,
+  move: false,
+  end: true,
+  cancel: true,
+}
+
 export const events: Record<string, string[]> = {
   start: ['touchstart', 'mousedown'],
   move: ['touchmove', 'mousemove'],

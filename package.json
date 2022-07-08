@@ -107,5 +107,8 @@
     "index.d.ts",
     "dist/*"
   ],
-  "dependencies": {}
+  "dependencies": {
+    "@types/lodash.debounce": "^4.0.7",
+    "lodash": "^4.17.21"
+  }
 }

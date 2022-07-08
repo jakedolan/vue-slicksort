@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import { defineComponent, PropType } from 'vue';
+import { defineComponent, nextTick, PropType } from 'vue';
 import Manager, { ItemRef, SortableNode } from './Manager';
 import SlicksortHub, { AcceptProp, ContainerRef } from './SlicksortHub';
 import {
@@ -11,6 +11,7 @@ import {
   closest,
   commonOffsetParent,
   events,
+  eventsPassive,
   getEdgeOffset,
   getElementMargin,
   getLockPixelOffsets,
@@ -43,6 +44,7 @@ interface ComponentProps {
   hideSortableGhost: boolean;
   lockToContainerEdges: boolean;
   lockOffset: string | number | string[];
+  targetDataLevel: string;
   transitionDuration: number;
   appendTo: string;
   draggedSettlingDuration: number;
@@ -191,6 +193,7 @@ export const ContainerMixin = defineComponent({
     rootUuid: { type: String, default: null},
     lockToContainerEdges: { type: Boolean, default: false },
     lockOffset: { type: [String, Number, Array] as PropType<string | number | number[]>, default: '50%' },
+    targetDataLevel: { stype: String, default: 'parent'},
     transitionDuration: { type: Number, default: 300 },
     appendTo: { type: String, default: 'body' },
     draggedSettlingDuration: { type: Number, default: null },
@@ -240,7 +243,8 @@ export const ContainerMixin = defineComponent({
   },
 
   mounted() {
-    // console.log("countainer mixin mounted", this.$props);
+    // console.log("list???", this.list);
+    // console.log("countainer mixin mounted", { props: this.$props, attrs: this.$attrs });
     if (this.hub) {
       this.id = this.hub.getId();
     }
@@ -257,7 +261,7 @@ export const ContainerMixin = defineComponent({
     for (const key in this.events) {
       if (hasOwnProperty(this.events, key)) {
         // @ts-ignore
-        events[key].forEach((eventName) => this.container.addEventListener(eventName, this.events[key]));
+        events[key].forEach((eventName) => this.container.addEventListener(eventName, this.events[key], { passive: eventsPassive[key] }));
       }
     }
 
@@ -286,23 +290,36 @@ export const ContainerMixin = defineComponent({
 
   methods: {
     handleStart(e: PointEvent) {
-      const { distance, shouldCancelStart } = this.$props;
+      // console.log("handleStart", e);
+      const { distance, shouldCancelStart, targetDataLevel } = this.$props;
 
       if ((!isTouch(e) && e.button === 2) || shouldCancelStart(e)) {
         return false;
       }
+      // console.log('continuing...');
 
       this._touched = true;
       this._pos = getPointerOffset(e);
       const target = e.target as HTMLElement;
 
       const node = closest(target, (el) => (el as SortableNode).sortableInfo != null) as SortableNode;
+      // console.log("node", { 'data-level': node?.dataset?.level, 'targetDataLevel': targetDataLevel });
+      if (node?.dataset?.level !== targetDataLevel) {
+        // console.log('not target data level so returning.');
+        this.cancel();
+        return;
+      }
 
       if (node && node.sortableInfo && this.nodeIsChild(node) && !this.sorting) {
         const { useDragHandle } = this.$props;
         const { index } = node.sortableInfo;
 
-        if (useDragHandle && !closest(target, (el) => (el as SortableNode).sortableHandle != null)) return;
+
+        // console.log("target.data", target);
+        if (useDragHandle && !closest(target, (el) => (el as SortableNode).sortableHandle != null)) {
+          // console.log("not drag handle");
+          return;
+        }
 
         this.manager.active = { index };
 
@@ -349,19 +366,30 @@ export const ContainerMixin = defineComponent({
       }
     },
 
-    handleEnd() {
+    handleEnd(e) {
+      // console.log("?? handleEnd", e);      
       if (!this._touched) return;
 
-      const { distance } = this.$props;
+      const { distance, targetDataLevel } = this.$props;
 
       this._touched = false;
 
+      // console.log("?? handleEnd", { distance});
       if (!distance) {
         this.cancel();
+      } else {        
+        const target = e.target as HTMLElement;
+        const node = closest(target, (el) => (el as SortableNode).sortableInfo != null) as SortableNode;
+        // console.log("node", { 'data-level': node?.dataset?.level, 'targetDataLevel': targetDataLevel });
+        if (node?.dataset?.level !== targetDataLevel) {
+          this.cancel();
+        }
       }
+      // this.cancel();
     },
 
     cancel() {
+      // console.log(`?? cancel ${!this.sorting}`);
       if (!this.sorting) {
         if (this.pressTimer) clearTimeout(this.pressTimer);
         this.manager.active = null;
@@ -439,11 +467,11 @@ export const ContainerMixin = defineComponent({
 
         this.listenerNode = isTouch(e) ? node : this._window;
         // @ts-ignore
-        events.move.forEach((eventName) => this.listenerNode.addEventListener(eventName, this.handleSortMove));
+        events.move.forEach((eventName) => this.listenerNode.addEventListener(eventName, this.handleSortMove, { passive: eventsPassive.move }));
         // @ts-ignore
-        events.end.forEach((eventName) => this.listenerNode.addEventListener(eventName, this.handleSortEnd));
+        events.end.forEach((eventName) => this.listenerNode.addEventListener(eventName, this.handleSortEnd, { passive: eventsPassive.end }));
         // @ts-ignore
-        events.cancel.forEach((eventName) => this.listenerNode.addEventListener(eventName, this.handleSortCancel));
+        events.cancel.forEach((eventName) => this.listenerNode.addEventListener(eventName, this.handleSortCancel, { passive: eventsPassive.cancel }));
 
         this.sorting = true;
 
@@ -481,15 +509,18 @@ export const ContainerMixin = defineComponent({
     },
 
     handleDropIn(payload: unknown) {
-      // console.log("container handleDropIn", { list: this.list, newIndex: this.newIndex, payload });
+      // console.log("container handleDropIn", { payload });
       const newValue = arrayInsert(this.list, this.newIndex!, payload);
       // console.log("this.list", this.list);
-      this.$emit('sort-insert', {
-        newIndex: this.newIndex,
-        value: payload,
-      });
       this.$emit('update:list', newValue);
-      this.handleDragEnd();
+
+      nextTick(() => {
+        this.$emit('sort-insert', {
+          newIndex: this.newIndex,
+          value: payload,
+        });
+        this.handleDragEnd();
+      });
     },
 
     handleDragOut() {
@@ -648,7 +679,7 @@ export const ContainerMixin = defineComponent({
 
       // Remove the helper class(es) early to give it a chance to transition back
       if (this.helper && this.helperClass) {
-        this.helper.classList.remove(...this.helperClass.split(' '));
+            this.helper.classList.remove(...this.helperClass.split(' '));        
       }
 
       // Stop autoscroll
@@ -656,6 +687,7 @@ export const ContainerMixin = defineComponent({
       this.autoscrollInterval = null;
 
       const onEnd = () => {
+        // console.log("onEnd")
         // Remove the helper from the DOM
         if (this.helper) {
           this.helper.remove();
@@ -665,6 +697,7 @@ export const ContainerMixin = defineComponent({
         if (this.hideSortableGhost && this.sortableGhost) {
           this.sortableGhost.style.visibility = '';
           this.sortableGhost.style.opacity = '';
+          this.sortableGhost = null;
         }
 
         resetTransform(nodes);
