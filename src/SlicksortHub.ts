@@ -42,15 +42,15 @@ export type AcceptProp = boolean | string[] | ((args: AcceptPropArgs) => boolean
  * Allow the same group by default, this can be overridden with the block prop
  */
 function canAcceptElement(dest: ContainerRef, source: ContainerRef, payload: unknown): boolean {
-  console.log('## canAcceptElement', { dest, source, payload});
+  // console.log('## canAcceptElement', { dest, source, payload});
   if (source.id === dest.id) return true;
 
   //! This is a bit hackish to prevent an existing list with leaves to be added to a leaf.
   if (dest.isLeaf && payload[dest.leavesFieldName] && Array.isArray(payload[dest.leavesFieldName]) && payload[dest.leavesFieldName].length > 0) {
-    console.log("## can't accept");
+    //console.log("## can't accept");
     return false;
   } else {
-    console.log("## Can accept", { isLeaf: dest.isLeaf, children: payload[dest.leavesFieldName], isArray: Array.isArray(payload[dest.leavesFieldName]), hasChildren: payload[dest.leavesFieldName]?.length > 0 });
+    // console.log("## Can accept", { isLeaf: dest.isLeaf, children: payload[dest.leavesFieldName], isArray: Array.isArray(payload[dest.leavesFieldName]), hasChildren: payload[dest.leavesFieldName]?.length > 0 });
   }
 
 
@@ -68,9 +68,9 @@ function canAcceptElement(dest: ContainerRef, source: ContainerRef, payload: unk
 
 
 function printRefs(refs: ContainerRef[]): void {
-  console.log("## REFS");
+  // console.log("## REFS");
   for (let i = 0; i < refs.length; i++) {
-    console.log(`${refs[i].id}`, refs[i]);
+    // console.log(`${refs[i].id}`, refs[i]);
   }
 }
 
