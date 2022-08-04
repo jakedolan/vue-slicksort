@@ -278,7 +278,9 @@ export const ContainerMixin = defineComponent({
       }
     }
 
-    if (this.hub) {
+    this.cleanUpHelper();
+
+    if (this.hub) {      
       this.hub.removeContainer(this as ContainerRef);
     }
 
@@ -289,6 +291,18 @@ export const ContainerMixin = defineComponent({
   },
 
   methods: {
+    cleanUpHelper() {
+      // Remove the helper from the DOM
+      if (this.helper) {
+        this.helper.remove();
+        this.helper = null;
+      }
+      if (this.hideSortableGhost && this.sortableGhost) {
+        this.sortableGhost.style.visibility = '';
+        this.sortableGhost.style.opacity = '';
+        this.sortableGhost = null;
+      }
+    },
     handleStart(e: PointEvent) {
       // console.log("handleStart", e);
       const { distance, shouldCancelStart, targetDataLevel } = this.$props;
@@ -688,17 +702,7 @@ export const ContainerMixin = defineComponent({
 
       const onEnd = () => {
         // console.log("onEnd")
-        // Remove the helper from the DOM
-        if (this.helper) {
-          this.helper.remove();
-          this.helper = null;
-        }
-
-        if (this.hideSortableGhost && this.sortableGhost) {
-          this.sortableGhost.style.visibility = '';
-          this.sortableGhost.style.opacity = '';
-          this.sortableGhost = null;
-        }
+        this.cleanUpHelper();
 
         resetTransform(nodes);
 
