@@ -239,6 +239,7 @@ export const ContainerMixin = defineComponent({
       sorting: false,
       hub: useHub ? this.SlicksortHub : null,
       manager: new Manager(),
+      _touched: false,
     } as unknown) as ComponentData;
   },
 
@@ -305,6 +306,8 @@ export const ContainerMixin = defineComponent({
     },
     handleStart(e: PointEvent) {
       // console.log("handleStart", e);
+      // prevent event propagation from child to parent.
+      e.stopPropagation()
       const { distance, shouldCancelStart, targetDataLevel } = this.$props;
 
       if ((!isTouch(e) && e.button === 2) || shouldCancelStart(e)) {
@@ -381,11 +384,15 @@ export const ContainerMixin = defineComponent({
     },
 
     handleEnd(e) {
+      const { distance, targetDataLevel } = this.$props;
+      
+      // Check if the dest is the same as the id of the component. This can arise due to nesting.
+      const dest = this.hub.getDest();
+      // console.log(`ts-action [${this.id}] handleEnd [${e?.type}] [${this._touched}] [${distance}] [${targetDataLevel}]`);
+      if (dest?.id !== this.id) return;
+
       // console.log("?? handleEnd", e);      
       if (!this._touched) return;
-
-      const { distance, targetDataLevel } = this.$props;
-
       this._touched = false;
 
       // console.log("?? handleEnd", { distance});
