@@ -306,8 +306,6 @@ export const ContainerMixin = defineComponent({
     },
     handleStart(e: PointEvent) {
       // console.log("handleStart", e);
-      // prevent event propagation from child to parent.
-      e.stopPropagation()
       const { distance, shouldCancelStart, targetDataLevel } = this.$props;
 
       if ((!isTouch(e) && e.button === 2) || shouldCancelStart(e)) {
